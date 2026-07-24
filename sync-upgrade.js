@@ -40,39 +40,57 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}-${String(d.getMinutes()).padStart(2,'0')}`;
   }
 
+  function isAppleMobile() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 1500);
+  }
+
   async function exportAgenda() {
     try {
       const data = await getData();
       const packageData = {
         format: 'AgendaELIP',
-        version: 2,
+        version: 3,
         exportedAt: new Date().toISOString(),
         device: navigator.userAgent,
         data
       };
       const json = JSON.stringify(packageData, replacer);
-      const blob = new Blob([json], { type: 'application/json' });
+      if (!json || json.length < 20) throw new Error('Backup vuoto');
+
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
       const filename = `AgendaELIP_${safeNameDate()}.agenda`;
 
-      if (navigator.share && navigator.canShare) {
-        const file = new File([blob], filename, { type: 'application/json' });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ title: 'Backup Agenda ELIP', files: [file] });
-          return;
+      if (isAppleMobile() && navigator.share && typeof navigator.canShare === 'function') {
+        try {
+          const file = new File([blob], filename, { type: 'application/json' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ title: 'Backup Agenda ELIP', files: [file] });
+            return;
+          }
+        } catch (shareError) {
+          if (shareError?.name === 'AbortError') return;
         }
       }
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      alert('Backup Agenda ELIP esportato. Conservalo in iCloud Drive, Google Drive o in una cartella del PC.');
+      downloadBlob(blob, filename);
+      setTimeout(() => alert('Backup Agenda ELIP esportato correttamente nella cartella Download.'), 250);
     } catch (error) {
-      if (error?.name !== 'AbortError') alert('Non è stato possibile esportare il backup.');
+      console.error('Errore esportazione Agenda ELIP:', error);
+      alert(`Non è stato possibile esportare il backup. Dettaglio: ${error?.message || 'errore sconosciuto'}`);
     }
   }
 
