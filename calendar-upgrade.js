@@ -2,11 +2,10 @@
   const actions = document.querySelector('#eventDialog .actions');
   if (!actions || document.getElementById('calendarBtn')) return;
 
-  const SHORTCUT_NAME = 'Agenda ELIP Calendario';
   const button = document.createElement('button');
   button.id = 'calendarBtn';
   button.type = 'button';
-  button.textContent = '📅 Aggiungi automaticamente';
+  button.textContent = '📅 Aggiungi al calendario';
   actions.insertBefore(button, actions.firstChild);
 
   const pad2 = n => String(n).padStart(2, '0');
@@ -27,30 +26,7 @@
     if (!title) throw new Error('Scrivi prima il nome dell’attività.');
     if (!date || !time) throw new Error('Inserisci data e ora dell’appuntamento.');
 
-    const start = new Date(`${date}T${time}:00`);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-    return {
-      title,
-      date,
-      time,
-      start: `${date}T${time}:00`,
-      end: `${end.getFullYear()}-${pad2(end.getMonth() + 1)}-${pad2(end.getDate())}T${pad2(end.getHours())}:${pad2(end.getMinutes())}:00`,
-      notes,
-      alarmOn,
-      alarmMinutes,
-      source: 'Agenda ELIP'
-    };
-  }
-
-  function isAppleMobile() {
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-
-  function runShortcut(eventData) {
-    const payload = encodeURIComponent(JSON.stringify(eventData));
-    const url = `shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}&input=text&text=${payload}`;
-    window.location.href = url;
+    return { title, date, time, notes, alarmOn, alarmMinutes };
   }
 
   function localStamp(date, time) {
@@ -82,23 +58,37 @@
       `DESCRIPTION:${esc(data.notes)}`,
       'STATUS:CONFIRMED'
     ];
-    if (data.alarmOn) lines.push('BEGIN:VALARM', `TRIGGER:-PT${data.alarmMinutes}M`, 'ACTION:DISPLAY', `DESCRIPTION:${esc(data.title)}`, 'END:VALARM');
+    if (data.alarmOn) {
+      lines.push('BEGIN:VALARM', `TRIGGER:-PT${data.alarmMinutes}M`, 'ACTION:DISPLAY', `DESCRIPTION:${esc(data.title)}`, 'END:VALARM');
+    }
     lines.push('END:VEVENT','END:VCALENDAR');
     return lines.join('\r\n');
   }
 
-  async function fallbackIcs(data) {
+  async function createCalendarFile(data) {
     const ics = buildIcs(data);
-    const safeTitle = (data.title || 'appuntamento').replace(/[^a-z0-9àèéìòù _-]/gi, '').trim().replace(/\s+/g, '-');
-    const file = new File([ics], `${safeTitle || 'appuntamento'}.ics`, { type: 'text/calendar' });
+    const safeTitle = (data.title || 'appuntamento')
+      .replace(/[^a-z0-9àèéìòù _-]/gi, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    const filename = `${safeTitle || 'appuntamento'}.ics`;
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const file = new File([blob], filename, { type: 'text/calendar' });
+
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ title: 'Aggiungi al Calendario', files: [file] });
-      return;
+      try {
+        await navigator.share({ title: 'Aggiungi al Calendario', files: [file] });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
     }
-    const url = URL.createObjectURL(file);
+
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = file.name;
+    a.download = filename;
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -108,11 +98,7 @@
   async function sendToCalendar() {
     try {
       const eventData = readEvent();
-      if (isAppleMobile()) {
-        runShortcut(eventData);
-      } else {
-        await fallbackIcs(eventData);
-      }
+      await createCalendarFile(eventData);
     } catch (error) {
       if (error?.name === 'AbortError') return;
       alert(error?.message || 'Non è stato possibile creare l’evento nel Calendario.');
