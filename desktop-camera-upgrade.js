@@ -1,5 +1,8 @@
 (() => {
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
+  const ua = navigator.userAgent || '';
+  const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const coarsePointer = window.matchMedia ? window.matchMedia('(pointer:coarse)').matches : false;
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile|CriOS|FxiOS|EdgiOS/i.test(ua) || (hasTouch && coarsePointer) || (hasTouch && /Macintosh/i.test(ua));
   const photoChoice = document.querySelector('.photo-choice');
   if (!photoChoice) return;
 
@@ -16,7 +19,16 @@
   `;
   document.head.appendChild(style);
 
-  if (isMobile) return;
+  if (isMobile) {
+    photoChoice.classList.remove('hidden');
+    photoChoice.style.display = 'flex';
+    const choose = document.getElementById('choosePhotoBtn');
+    const take = document.getElementById('takePhotoBtn');
+    if (choose) { choose.classList.remove('hidden'); choose.style.display = ''; choose.textContent = '🖼️ Scegli dalla libreria'; }
+    if (take) { take.classList.remove('hidden'); take.style.display = ''; take.textContent = '📷 Scatta foto'; }
+    document.getElementById('desktopMediaBox')?.remove();
+    return;
+  }
 
   photoChoice.classList.add('hidden');
 
@@ -56,6 +68,7 @@
 
   async function openCamera(nextMode){
     mode = nextMode;
+    action.disabled = false;
     document.getElementById('desktopCameraTitle').textContent = mode === 'photo' ? 'Scatta foto con webcam' : 'Registra video con webcam';
     action.textContent = mode === 'photo' ? '📸 Scatta' : '● Avvia registrazione';
     action.dataset.recording = 'no';
@@ -93,7 +106,7 @@
       canvas.width = preview.videoWidth || 1280;
       canvas.height = preview.videoHeight || 720;
       canvas.getContext('2d').drawImage(preview,0,0,canvas.width,canvas.height);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/jpeg',0.9));
+      const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/jpeg',0.88));
       const file = new File([blob],`webcam-${Date.now()}.jpg`,{type:'image/jpeg'});
       const dt = new DataTransfer(); dt.items.add(file);
       const input = document.getElementById('photoLibraryInput');
