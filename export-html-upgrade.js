@@ -5,7 +5,7 @@
   const button = document.createElement('button');
   button.type = 'button';
   button.id = 'exportHtmlBtn';
-  button.textContent = '📤 Esporta nota in HTML';
+  button.textContent = '📤 Condividi Nota';
   actions.insertBefore(button, actions.firstChild);
 
   const esc = value => String(value ?? '')
