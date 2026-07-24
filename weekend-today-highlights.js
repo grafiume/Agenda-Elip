@@ -12,11 +12,12 @@
   `;
   document.head.appendChild(style);
 
+  const pad = n => String(n).padStart(2,'0');
   const todayKey = () => {
     const d = new Date();
-    const p = n => String(n).padStart(2,'0');
-    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   };
+  const currentHourKey = () => `${pad(new Date().getHours())}:00`;
 
   function clearClasses(root=document){
     root.querySelectorAll('.elip-saturday,.elip-sunday,.elip-today').forEach(el=>{
@@ -31,11 +32,15 @@
     heads[5]?.classList.add('elip-saturday');
     heads[6]?.classList.add('elip-sunday');
 
+    const today = todayKey();
+    const currentHour = currentHourKey();
     calendar.querySelectorAll('.cell[data-date]').forEach(cell=>{
       const d = new Date(`${cell.dataset.date}T12:00:00`);
       if (d.getDay() === 6) cell.classList.add('elip-saturday');
       if (d.getDay() === 0) cell.classList.add('elip-sunday');
-      if (cell.dataset.date === todayKey()) cell.classList.add('elip-today');
+      if (cell.dataset.date === today && cell.dataset.time === currentHour) {
+        cell.classList.add('elip-today');
+      }
     });
   }
 
@@ -88,5 +93,6 @@
 
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});
   window.addEventListener('load',schedule);
+  setInterval(schedule,60000);
   schedule();
 })();
